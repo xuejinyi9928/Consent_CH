@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Participant Consent</title>
+    <script src="https://unpkg.com/pdf-lib"></script>
+    <script src="https://unpkg.com/@pdf-lib/fontkit"></script>
+    <style>
+        body {
+            display: flex;
+            height: 100vh;
+            margin: 0;
+        }
+        #pdfContainer {
+            flex: 1;
+            border-right: 1px solid #000;
+            overflow: auto;
+        }
+        #formContainer {
+            flex: 1;
+            padding: 20px;
+        }
+        canvas {
+            border: 1px solid #000;
+        }
+    </style>
+</head>
+<body>
+    <div id="pdfContainer">
+        <iframe src="consent.pdf" width="99%" height="99%"></iframe>
+    </div>
+    <div id="formContainer">
+        <h2>请仔细阅读知情同意书，填写下列信息完成签署：</h2>
+        <form id="userForm">
+            <label for="name">参与者姓名:</label><br>
+            <input type="text" id="name" required><br><br>
+            <label for="id">参与者编号:</label><br>
+            <input type="number" id="id" required><br><br>
+            <label for="phone">联系电话:</label><br>
+            <input type="tel" id="phone" required><br><br>
+            <label for="signature">手写签名:</label><br>
+            <canvas id="signature" width="300" height="100"></canvas>
+            <button type="button" onclick="clearCanvas()">重写签名</button><br><br>
+            <button type="submit">完成签署</button>
+    </form>
+</body>
+
+<script>
+    const canvas = document.getElementById('signature');
+    const ctx = canvas.getContext('2d');
+    let drawing = false;
+
+    canvas.addEventListener('mousedown', () => { drawing = true; });
+    canvas.addEventListener('mouseup', () => { drawing = false; ctx.beginPath(); });
+    canvas.addEventListener('mousemove', draw);
+
+    function draw(e) {
+        if (!drawing) return;
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = 'black';
+
+        ctx.lineTo(e.clientX - canvas.offsetLeft, e.clientY - canvas.offsetTop);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(e.clientX - canvas.offsetLeft, e.clientY - canvas.offsetTop);
+    }
+
+    function clearCanvas() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+
+
+    document.getElementById('userForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const name = document.getElementById('name').value;
+        const phone = document.getElementById('phone').value;
+        const id = document.getElementById('id').value;
+        if (!name || !phone || !id) {
+            alert('请填写所有信息。');
+            return;
+        }
+        const date = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+
+        const existingPdfBytes = await fetch('consent.pdf').then(res => res.arrayBuffer());
+        const pdfDoc = await PDFLib.PDFDocument.load(existingPdfBytes);
+
+        const fontBytes = await fetch('simsun.ttf').then(res => res.arrayBuffer());
+        pdfDoc.registerFontkit(fontkit)
+        const customFont = await pdfDoc.embedFont(fontBytes)
+
+        const pages = pdfDoc.getPages();
+        const firstPage = pages[0];
+        const {width, height} = firstPage.getSize()
+
+        firstPage.drawText(name, { x: 170, y: height-150, size: 16, font: customFont });
+        firstPage.drawText(phone, { x: 140, y: height-180, size: 16, font: customFont });
+        firstPage.drawText(id, { x: 450, y: height-150, size: 16, font: customFont });
+
+        const secondPage = pages[1];
+        secondPage.drawText(date, { x: 400, y: height-610, size: 16, font: customFont });
+        const imgData = canvas.toDataURL('image/png');
+        const pngImage = await pdfDoc.embedPng(imgData);
+        const pngDims = pngImage.scale(1);
+        secondPage.drawImage(pngImage, {
+            x: 190,
+            y: height-580,
+            width: pngDims.width/3,
+            height: pngDims.height/3,
+        });
+        
+        const pdfBytes = await pdfDoc.save()
+        
+        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `consent_${id}.pdf`;
+        link.click();
+
+        alert('签署完成，已下载签署后的知情同意书。');
+    });
+</script>
+
+</html>
