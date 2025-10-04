@@ -42,7 +42,7 @@
             <label for="signature">手写签名:</label><br>
             <canvas id="signature" width="300" height="100"></canvas>
             <button type="button" onclick="clearCanvas()">重写签名</button><br><br>
-            <button type="submit">完成签署</button>
+            <button type="submit">完成签署并下载</button>
     </form>
 </body>
 
@@ -119,7 +119,7 @@
         link.download = `consent_${id}.pdf`;
         link.click();
 
-        alert('签署完成，已下载签署后的知情同意书。');
+        alert('签署完成，知情同意书已下载。');
     });
 </script>
 
